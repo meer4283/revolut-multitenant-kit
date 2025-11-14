@@ -71,7 +71,7 @@ async function main() {
   console.log("   Webhook URL:", webhookUrl);
 
   try {
-    const response = await fetch("https://merchant.revolut.com/api/1.0/webhooks", {
+    const response = await fetch("https://sandbox-merchant.revolut.com/api/1.0/webhooks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

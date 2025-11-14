@@ -34,7 +34,7 @@ export default function UnifiedCheckout({
   }
 
   const createOrder = async () => {
-    const res = await fetch("/api/revolut/orders", {
+    const res = await fetch("/api/revolut/orders/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tenant_id: tenantId, env, currency, items: cart, email }),
