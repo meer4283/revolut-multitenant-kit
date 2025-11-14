@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const sig = req.headers.get("revolut-signature") || "";
   const ts  = req.headers.get("revolut-request-timestamp") || "";
 
-  const signingSecret = process.env.REVOLUT_WEBHOOK_SECRET;
+  const signingSecret = "wsk_ddftoOXmvubuv3rVNND81FyGirBckSjP";
   if (!signingSecret) return NextResponse.json({ error: "Missing REVOLUT_WEBHOOK_SECRET" }, { status: 400 });
 
   const expected = `v1=${crypto.createHmac("sha256", signingSecret).update(`v1.${ts}.${raw}`).digest("hex")}`;
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
 
   const evt = JSON.parse(raw) as { event: string; order_id?: string; data?: any };
 
+  console.log("[revolut:webhook] event received:", evt);
   // store event
   const existingOrder = evt.order_id
     ? await prisma.order.findUnique({ where: { revolut_order_id: evt.order_id } })
