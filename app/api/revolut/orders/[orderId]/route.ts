@@ -5,21 +5,15 @@ import { BASE } from "../../../../lib/revolut";
 export async function GET(_req: NextRequest, { params }: { params: { orderId: string } }) {
   try {
     const existing = await prisma.order.findUnique({
-      where: { revolut_order_id: params.orderId },
-      include: { tenant: true }
+      where: { revolut_order_id: params.orderId }
     });
 
     if (!existing) {
       return NextResponse.json({ error: "order not found" }, { status: 404 });
     }
 
-    const isLive = existing.capture_mode === "MANUAL" // env is not tied to capture mode; we need tenant keys
-      ? !!existing.tenant.revolut_secret_key_live && !existing.tenant.revolut_secret_key_sandbox
-      : false;
-
-    // Pick the key based on where you created it. For demo, assume sandbox if sandbox key exists.
-    const secretKey = existing.tenant.revolut_secret_key_sandbox || existing.tenant.revolut_secret_key_live;
-    if (!secretKey) return NextResponse.json({ error: "tenant has no secret key" }, { status: 400 });
+    const secretKey = process.env.REVOLUT_SECRET_KEY;
+    if (!secretKey) return NextResponse.json({ error: "Missing REVOLUT_SECRET_KEY" }, { status: 400 });
 
     const res = await fetch(`${BASE}/api/orders/${params.orderId}`, {
       headers: {

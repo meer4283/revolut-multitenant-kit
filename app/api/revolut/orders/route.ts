@@ -7,8 +7,6 @@ type CartItem = { name: string; unitPrice: number; qty: number; image?: string }
 export async function POST(req: NextRequest) {
   try {
     const {
-      tenant_id,
-      env = "sandbox",
       currency = "GBP",
       items = [],
       email,
@@ -16,8 +14,6 @@ export async function POST(req: NextRequest) {
       selectedMethod,
       order_number
     }: {
-      tenant_id: string;
-      env?: "sandbox" | "live";
       currency?: string;
       items: CartItem[];
       email?: string;
@@ -26,15 +22,8 @@ export async function POST(req: NextRequest) {
       order_number?: string;
     } = await req.json();
 
-    if (!tenant_id) return NextResponse.json({ error: "tenant_id required" }, { status: 400 });
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
-    if (!tenant) return NextResponse.json({ error: "tenant not found" }, { status: 404 });
-
-    const secretKey =
-      env === "live" ? tenant.revolut_secret_key_live : tenant.revolut_secret_key_sandbox;
-    if (!secretKey) {
-      return NextResponse.json({ error: `Missing ${env} Revolut secret key for tenant` }, { status: 400 });
-    }
+    const secretKey = "sk_TM7CxBpeH2Z52tNv2d_sWWFBxhlZlaVzr3wvrp9SZ352q0jYiV3Zk1Qg0II3NTHT"; //"wsk_ddftoOXmvubuv3rVNND81FyGirBckSjP";
+    if (!secretKey) return NextResponse.json({ error: "Missing REVOLUT_SECRET_KEY" }, { status: 400 });
 
     // Compute totals & line items
     const amountMajor = (items as CartItem[]).reduce((s, it) => s + (Number(it.unitPrice) * Number(it.qty)), 0);
@@ -61,12 +50,8 @@ export async function POST(req: NextRequest) {
         "Revolut-Api-Version": process.env.REVOLUT_API_VERSION || "2024-09-01",
       },
       body: JSON.stringify({
-        amount,
-        currency,
-        capture_mode: captureMode,
-        description: "Cart checkout",
-        line_items,
-        customer: email ? { email } : undefined,
+       "amount": 500,
+  "currency": "GBP"
       }),
     });
 
@@ -82,7 +67,6 @@ export async function POST(req: NextRequest) {
     const created = await prisma.order.create({
       data: {
         order_number: order_number || `ORD-${now.getTime()}`,
-        tenant_id,
         customer: email
           ? {
               connectOrCreate: {

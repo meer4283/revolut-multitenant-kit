@@ -6,13 +6,11 @@ import RevolutCheckout from "@revolut/checkout";
 type CartItem = { name: string; unitPrice: number; qty: number; image?: string };
 
 export default function UnifiedCheckout({
-  cart, email, currency = "GBP", tenantId = "demo-tenant", env = "sandbox"
+  cart, email, currency = "GBP"
 }: {
   cart: CartItem[];
   email?: string;
   currency?: string;
-  tenantId?: string;
-  env?: "sandbox" | "live";
 }) {
   const [loading, setLoading] = useState(false);
   const payReqRef = useRef<HTMLDivElement>(null);
@@ -37,9 +35,10 @@ export default function UnifiedCheckout({
     const res = await fetch("/api/revolut/orders/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tenant_id: tenantId, env, currency, items: cart, email }),
+      body: JSON.stringify({ currency, items: cart, email }),
     });
     const data = await res.json();
+    console.log("order data", data)
     if (data.error) throw new Error(data.error);
     lastOrderIdRef.current = data.orderId;
     return { publicId: data.token };
@@ -97,7 +96,7 @@ export default function UnifiedCheckout({
       });
       document.getElementById("pay-by-bank-btn")?.addEventListener("click", () => pbb.show());
     })();
-  }, [cart, currency, email, env, tenantId]);
+  }, [cart, currency, email]);
 
   const payByCard = async () => {
     setLoading(true);
@@ -105,7 +104,7 @@ export default function UnifiedCheckout({
       const res = await fetch("/api/revolut/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant_id: tenantId, env, currency, items: cart, email }),
+        body: JSON.stringify({ currency, items: cart, email }),
       });
       const { token, orderId, error } = await res.json();
       if (error) throw new Error(error);

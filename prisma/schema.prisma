@@ -52,28 +52,6 @@ enum ItemType {
   SERVICE
 }
 
-model Tenant {
-  id                                String   @id @default(cuid())
-  name                              String
-
-  // Revolut API keys per env
-  revolut_secret_key_sandbox        String?  @db.VarChar(255)
-  revolut_secret_key_live           String?  @db.VarChar(255)
-
-  // Webhook IDs & signing secrets
-  revolut_webhook_id_sandbox        String?  @db.VarChar(128)
-  revolut_webhook_secret_sandbox    String?  @db.VarChar(255)
-  revolut_webhook_id_live           String?  @db.VarChar(128)
-  revolut_webhook_secret_live       String?  @db.VarChar(255)
-
-  webhook_base_url                  String?  @db.VarChar(512)
-
-  created_at                        DateTime @default(now())
-  updated_at                        DateTime @updatedAt
-
-  orders                            Order[]
-}
-
 model Customer {
   id          String   @id @default(cuid())
   email       String   @unique @db.VarChar(191)
@@ -89,7 +67,6 @@ model Order {
   id                    String       @id @default(cuid())
   order_number          String       @unique @db.VarChar(64)
 
-  tenant_id             String       @db.VarChar(191)
   customer_id           String?      @db.VarChar(191)
   email                 String?      @db.VarChar(191)
 
@@ -107,7 +84,6 @@ model Order {
   created_at            DateTime     @default(now())
   updated_at            DateTime     @updatedAt
 
-  tenant                Tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   customer              Customer?    @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   items                 OrderItem[]
   payments              Payment[]
@@ -115,7 +91,6 @@ model Order {
   webhook_events        WebhookEvent[]
 
   @@map("orders")
-  @@index([tenant_id, created_at])
   @@index([state, created_at])
 }
 

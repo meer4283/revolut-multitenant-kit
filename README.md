@@ -1,78 +1,84 @@
-# Revolut Multitenant Kit (Next.js + Prisma)
+# Revolut Checkout – Simple Integration (Next.js + Prisma)
 
-A drop-in starter for **Revolut Checkout** with **multi-tenant** support, built on **Next.js (App Router)** and **Prisma**.
+This is a minimal, single-merchant integration for Revolut Checkout using Next.js (App Router) and Prisma.
 
-Features:
-- Create orders with tenant‑specific API keys
-- All payment options (Cards, Apple/Google Pay via Payment Request, Revolut Pay, Pay by Bank)
-- Webhook URL with `?tenant_id=<id>&env=<sandbox|live>`
-- HMAC verification using each tenant’s **signing_secret**
-- Admin endpoints to **register**, **inspect** and **rotate** webhooks per tenant
-- Prisma models for tenants, orders, items, payments, refunds, webhook events
-- Demo checkout + QA panel with sandbox test cards
+- Cards, Payment Request (Apple/Google Pay), Revolut Pay, Pay by Bank
+- Server creates orders via Revolut Merchant API
+- Webhook verifies HMAC using a single signing secret from env
+- Stores orders, items, payments, refunds, and webhook events in MySQL (via Prisma)
 
 ## 1) Install & configure
 
 ```bash
-pnpm i   # or npm i / yarn
-cp .env.example .env.local
-# add DATABASE_URL, PUBLIC_API_BASE_URL, NEXT_PUBLIC_REVOLUT_PUBLIC_KEY, etc.
+pnpm i   # or: npm i / yarn
+```
+
+Create `.env.local` with:
+
+```
+DATABASE_URL="mysql://user:pass@localhost:3306/revolut_simple"
+
+# Revolut
+REVOLUT_SECRET_KEY="rk_test_..."           # Server-side secret key (sandbox or live)
+REVOLUT_WEBHOOK_SECRET="whsec_..."         # Webhook signing secret
+NEXT_PUBLIC_REVOLUT_PUBLIC_KEY="pk_test_..."  # Public key for @revolut/checkout
+
+# Sandbox by default; set to "prod" for live API host
+NEXT_PUBLIC_REVOLUT_MODE="sandbox"
+# Optional, defaults to sandbox host when not "prod"
+# REVOLUT_MODE="prod"
+
+# Optional, defaults to "2024-09-01"
+# REVOLUT_API_VERSION="2024-09-01"
 ```
 
 Prisma:
+
 ```bash
 npx prisma migrate dev -n init
 npx prisma generate
-npx prisma studio  # optional, to inspect tables
 ```
 
-Seed a tenant (use Prisma Studio):
-- Create a **Tenant** row with `id`, `name` and at least `revolut_secret_key_sandbox`.
-- (Optional) Set `webhook_base_url` to your public API base (e.g. https://api.example.com)
-
 Start dev:
+
 ```bash
 npm run dev
 ```
 
-Visit: `http://localhost:3000/checkout`
+Visit `http://localhost:3000/checkout`
 
-> The UI shows a “Sandbox” banner if `NEXT_PUBLIC_REVOLUT_MODE !== "prod"`
+## 2) Webhook
 
-## 2) Register a sandbox webhook for a tenant
-Call the admin endpoint:
-```bash
-curl -X POST http://localhost:3000/api/admin/revolut/webhooks/register \\
-  -H "Content-Type: application/json" \\
-  -d '{"tenant_id":"<TENANT_ID>","env":"sandbox","webhook_base_url":"https://your-public-url"}'
+Expose your local server (ngrok/cloudflared) and register the webhook in your Revolut merchant dashboard to:
+
 ```
-Save the response; the **signing_secret** is stored on the tenant record.
+POST https://YOUR_PUBLIC_URL/api/revolut/webhook
+```
 
-## 3) Make a sandbox payment
-- Use the demo **/checkout** page.
-- Open with `?qa=1` to show the **QA panel** and copy test card numbers.
-- After paying, you’ll see **/thank-you** or **/order-pending**. The webhook will mark orders completed when it arrives.
+Set `REVOLUT_WEBHOOK_SECRET` to the signing secret from the dashboard. The server will:
+- Verify `Revolut-Signature` HMAC
+- Store the event
+- Update internal order/payment state on key events (authorised, completed, cancelled)
 
-## 4) API overview
+## 3) API overview (single-merchant)
 
-- `POST /api/revolut/orders` — create order (expects `{ tenant_id, env, currency, items, email }`)
-- `GET  /api/revolut/orders/:orderId` — retrieve order from Revolut (uses tenant key based on DB record)
-- `POST /api/revolut/orders/:orderId/capture` — manual capture (optional)
-- `POST /api/revolut/orders/:orderId/cancel`  — cancel auth (manual flow)
-- `POST /api/revolut/orders/:orderId/refund`  — refund captured order
+- `POST /api/revolut/orders`
+  - Body: `{ currency, items, email, captureMode?, selectedMethod?, order_number? }`
+  - Uses `REVOLUT_SECRET_KEY`
+- `GET  /api/revolut/orders/:orderId`
+- `POST /api/revolut/orders/:orderId/capture`
+- `POST /api/revolut/orders/:orderId/cancel`
+- `POST /api/revolut/orders/:orderId/refund`
+- `POST /api/revolut/webhook`
+  - Uses `REVOLUT_WEBHOOK_SECRET`
 
-- `POST /api/admin/revolut/webhooks/register` — register tenant webhook (stores `webhook_id` + `signing_secret`)
-- `GET  /api/admin/revolut/webhooks/:tenantId` — read masked webhook data
-- `POST /api/admin/revolut/webhooks/:tenantId/rotate` — rotate signing secret
+Amounts are minor units on the API; the UI converts from major units.
 
-- `POST /api/revolut/webhook?tenant_id=<id>&env=<sandbox|live>` — webhook receiver (verifies HMAC, updates DB)
+## 4) Notes
 
-## 5) Notes
+- Use HTTPS for webhooks.
+- Fulfil on `ORDER_COMPLETED` (from webhook or confirmed server-side fetch), not only on client success callbacks.
+- Apple Pay requires domain verification in production.
 
-- **HTTPS only** for webhooks. Use a tunnel (ngrok/cloudflared) for local tests.
-- Always **fulfil** on `ORDER_COMPLETED` (webhook or server-side retrieval), not only client success UI.
-- Amounts are **minor units** (integers). Quantity format is `{ "quantity": { "value": <number> } }`.
-- Apple Pay requires domain registration in production.
-
-## 6) License
+## 5) License
 MIT

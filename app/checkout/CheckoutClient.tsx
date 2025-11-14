@@ -13,15 +13,11 @@ function formatMoney(v: number, currency = "GBP") {
 export default function CheckoutClient({
   initialCart,
   email,
-  currency = "GBP",
-  tenantId = "demo-tenant",
-  env = "sandbox"
+  currency = "GBP"
 }: {
   initialCart: CartItem[];
   email?: string;
   currency?: string;
-  tenantId?: string;
-  env?: "sandbox" | "live";
 }) {
   const [cart, setCart] = useState<CartItem[]>(initialCart);
 
@@ -112,7 +108,7 @@ export default function CheckoutClient({
         </div>
       </div>
 
-      <UnifiedCheckout cart={cart} email={email} currency={currency} tenantId={tenantId} env={env} />
+      <UnifiedCheckout cart={cart} email={email} currency={currency} />
 
       <TestCardsQA
         currentTotalMinor={totalMinor}

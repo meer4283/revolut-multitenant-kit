@@ -11,6 +11,6 @@ export default async function CheckoutPage() {
   const email = "customer@example.com";
 
   return (
-    <CheckoutClient initialCart={initialCart} email={email} currency={currency} tenantId="demo-tenant" env="sandbox" />
+    <CheckoutClient initialCart={initialCart} email={email} currency={currency} />
   );
 }

@@ -11,25 +11,16 @@ function safeEqual(a: string, b: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const url = new URL(req.url);
-  const tenantId = url.searchParams.get("tenant_id") || "";
-  const env = (url.searchParams.get("env") || "sandbox").toLowerCase();
-
-  if (!tenantId) return NextResponse.json({ error: "tenant_id missing" }, { status: 400 });
-
   const raw = await req.text();
   const sig = req.headers.get("revolut-signature") || "";
   const ts  = req.headers.get("revolut-request-timestamp") || "";
 
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  if (!tenant) return NextResponse.json({ error: "tenant not found" }, { status: 404 });
-
-  const signingSecret = env === "live" ? tenant.revolut_webhook_secret_live : tenant.revolut_webhook_secret_sandbox;
-  if (!signingSecret) return NextResponse.json({ error: `no ${env} signing secret for tenant` }, { status: 400 });
+  const signingSecret = process.env.REVOLUT_WEBHOOK_SECRET;
+  if (!signingSecret) return NextResponse.json({ error: "Missing REVOLUT_WEBHOOK_SECRET" }, { status: 400 });
 
   const expected = `v1=${crypto.createHmac("sha256", signingSecret).update(`v1.${ts}.${raw}`).digest("hex")}`;
   if (!safeEqual(sig, expected)) {
-    console.warn("[revolut:webhook] bad signature", { tenantId, env });
+    console.warn("[revolut:webhook] bad signature");
     return new NextResponse("Invalid signature", { status: 400 });
   }
 
