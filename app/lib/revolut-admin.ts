@@ -5,11 +5,16 @@ export async function revolutAdminFetch(path: string, secretKey: string, init: R
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Accept": "application/json",
       Authorization: `Bearer ${secretKey}`,
       ...(init.headers || {}),
     },
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Revolut API Error:", errorText);
+    throw new Error(errorText);
+  }
   return res.json();
 }

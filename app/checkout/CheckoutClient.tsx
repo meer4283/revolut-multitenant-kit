@@ -88,7 +88,7 @@ export default function CheckoutClient({
               <div className="h-16 w-16 rounded bg-gray-200" />
             )}
             <div className="flex-1">
-              <div className="font-medium">{item.name}</div></div>
+              <div className="font-medium">{item.name}</div>
               <div className="text-sm text-gray-600">
                 {item.qty} × {formatMoney(item.unitPrice, currency)}
               </div>

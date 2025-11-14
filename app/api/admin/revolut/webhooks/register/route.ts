@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenant_id } });
     if (!tenant) return NextResponse.json({ error: "tenant not found" }, { status: 404 });
 
-    const secretKey = "sk_TM7CxBpeH2Z52tNv2d_sWWFBxhlZlaVzr3wvrp9SZ352q0jYiV3Zk1Qg0II3NTHT"
+    const secretKey =
+      env === "live" ? tenant.revolut_secret_key_live : tenant.revolut_secret_key_sandbox;
     if (!secretKey) return NextResponse.json({ error: `Missing ${env} secret key` }, { status: 400 });
 
     const baseUrl =
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     });
 
-    console.log("data", data)
+    console.log("Webhook registered:", data)
     if (env === "live") {
       await prisma.tenant.update({
         where: { id: tenant_id },
@@ -60,14 +61,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const masked = (s: string) => (s ? s.slice(0, 10) + "••••" + s.slice(-4) : null);
 
     return NextResponse.json({
       id: data.id,
       url: data.url,
       env,
-      signing_secret_preview: data.signing_secret,
+      signing_secret: data.signing_secret,
+      signing_secret_preview: masked(data.signing_secret),
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e }, { status: 400 });
+    console.error("Webhook registration error:", e);
+    return NextResponse.json({ error: e.message || String(e) }, { status: 400 });
   }
 }
