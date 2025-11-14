@@ -46,9 +46,12 @@ export default function UnifiedCheckout({
 
   useEffect(() => {
     (async () => {
+      const mode = process.env.NEXT_PUBLIC_REVOLUT_MODE === "prod" ? "prod" : "sandbox";
       const payments = await RevolutCheckout.payments({
         publicToken: process.env.NEXT_PUBLIC_REVOLUT_PUBLIC_KEY!,
         locale: "en",
+        // ensure widget environment matches backend host and keys
+        mode,
       });
 
       if (payReqRef.current) {
