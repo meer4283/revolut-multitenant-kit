@@ -1,0 +1,194 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrderState {
+  CREATED
+  AUTHORISED
+  COMPLETED
+  CANCELLED
+  FAILED
+  REJECTED
+  EXPIRED
+}
+
+enum CaptureMode {
+  AUTOMATIC
+  MANUAL
+}
+
+enum PaymentMethod {
+  CARD
+  APPLE_PAY
+  GOOGLE_PAY
+  REVOLUT_PAY
+  PAY_BY_BANK
+}
+
+enum PaymentStatus {
+  INITIATED
+  AUTHORISED
+  CAPTURED
+  PARTIALLY_CAPTURED
+  CANCELLED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  SUBMITTED
+  SUCCEEDED
+  FAILED
+}
+
+enum ItemType {
+  PHYSICAL
+  SERVICE
+}
+
+model Tenant {
+  id                                String   @id @default(cuid())
+  name                              String
+
+  // Revolut API keys per env
+  revolut_secret_key_sandbox        String?  @db.VarChar(255)
+  revolut_secret_key_live           String?  @db.VarChar(255)
+
+  // Webhook IDs & signing secrets
+  revolut_webhook_id_sandbox        String?  @db.VarChar(128)
+  revolut_webhook_secret_sandbox    String?  @db.VarChar(255)
+  revolut_webhook_id_live           String?  @db.VarChar(128)
+  revolut_webhook_secret_live       String?  @db.VarChar(255)
+
+  webhook_base_url                  String?  @db.VarChar(512)
+
+  created_at                        DateTime @default(now())
+  updated_at                        DateTime @updatedAt
+
+  orders                            Order[]
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  email       String   @unique @db.VarChar(191)
+  first_name  String?  @db.VarChar(191)
+  last_name   String?  @db.VarChar(191)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  orders      Order[]
+}
+
+model Order {
+  id                    String       @id @default(cuid())
+  order_number          String       @unique @db.VarChar(64)
+
+  tenant_id             String       @db.VarChar(191)
+  customer_id           String?      @db.VarChar(191)
+  email                 String?      @db.VarChar(191)
+
+  total_amount_minor    Int
+  currency              String       @db.Char(3)
+
+  capture_mode          CaptureMode  @default(AUTOMATIC)
+  state                 OrderState   @default(CREATED)
+
+  revolut_order_id      String       @unique @db.VarChar(191)
+  revolut_public_token  String       @unique @db.VarChar(191)
+  selected_method       PaymentMethod?
+
+  description           String?      @db.VarChar(255)
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+
+  tenant                Tenant       @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  customer              Customer?    @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  items                 OrderItem[]
+  payments              Payment[]
+  refunds               Refund[]
+  webhook_events        WebhookEvent[]
+
+  @@map("orders")
+  @@index([tenant_id, created_at])
+  @@index([state, created_at])
+}
+
+model OrderItem {
+  id                 String   @id @default(cuid())
+  order_id           String   @db.VarChar(191)
+  name               String   @db.VarChar(255)
+  item_type          ItemType @default(PHYSICAL)
+  quantity           Int
+  unit_price_minor   Int
+  total_amount_minor Int
+  image_url          String?  @db.VarChar(2048)
+
+  order              Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+  @@index([order_id])
+}
+
+model Payment {
+  id                    String         @id @default(cuid())
+  order_id              String         @db.VarChar(191)
+  method                PaymentMethod
+  status                PaymentStatus  @default(INITIATED)
+  amount_minor          Int
+  currency              String         @db.Char(3)
+  provider_payment_id   String?        @unique @db.VarChar(191)
+  provider_order_id     String?        @db.VarChar(191)
+  authorised_at         DateTime?
+  captured_at           DateTime?
+  cancelled_at          DateTime?
+  failed_at             DateTime?
+  raw_payload           Json?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  order                 Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+  @@index([order_id])
+  @@index([status, created_at])
+}
+
+model Refund {
+  id                   String        @id @default(cuid())
+  order_id             String        @db.VarChar(191)
+  amount_minor         Int
+  currency             String        @db.Char(3)
+  status               RefundStatus  @default(SUBMITTED)
+  reason               String?       @db.VarChar(255)
+  provider_refund_id   String?       @unique @db.VarChar(191)
+  provider_order_id    String?       @db.VarChar(191)
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @updatedAt
+
+  order                Order         @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("refunds")
+  @@index([order_id, created_at])
+}
+
+model WebhookEvent {
+  id                   String   @id @default(cuid())
+  provider             String   @db.VarChar(32)
+  event_type           String   @db.VarChar(64)
+  provider_order_id    String?  @db.VarChar(191)
+  signature_valid      Boolean  @default(false)
+  payload_json         Json
+  received_at          DateTime @default(now())
+  order_id             String?  @db.VarChar(191)
+  order                Order?   @relation(fields: [order_id], references: [id], onDelete: SetNull)
+
+  @@map("webhook_events")
+  @@index([provider_order_id, received_at])
+  @@index([event_type, received_at])
+}
